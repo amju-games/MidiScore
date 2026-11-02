@@ -15,6 +15,32 @@ class MidiEventList;
 
 namespace MidiScore
 {
+// Flags to control the output from MidiScore.
+struct Flags
+{
+  // debug: true for debug mode.
+  bool debug = false;
+
+  // allClefs: allow alto and tenor clefs in output if true;
+  //  if false, only allow bass and treble clefs.
+  bool allClefs = false;
+
+  // grid: output in grid format
+  bool grid = false;
+
+  // Retain chords: allow chords in output, e.g. "( c4 e4 )"
+  bool poly = false;
+
+  // If specified track is polyphonic, split into separate mono tracks.
+  bool saveSplitPoly = false;
+
+  // If true, prefer staccato where possible.
+  bool stac = false;
+
+  // If true, detect and mark up ornaments.
+  bool detectOrnaments = false;
+};
+
 // Output midi file as juliet shorthand notation, for reading 
 //  by MakeScore.
 // mf: the midi file.
@@ -22,25 +48,17 @@ namespace MidiScore
 // timeSig: NON optional time signature
 // keySig: optional key signature, overrides guessing.
 // quantResolution: optional, sets quantisation on and resolution level.
-// debug: true for debug mode, verbose for debugging.
 // bpm: optional bpm tempo.
 // anacrusis: optional short first bar time value (c, m, etc).
-// allClefs: allow alto and tenor clefs in output
-// grid: output in grid format
-// poly: retain chords
 std::string ToString(
   smf::MidiFile& mf,
   std::optional<int> track,
   std::string timeSig, 
   std::optional<int> keySig,
   std::optional<std::string> quantResolution,
-  bool debug,
   std::optional<float> bpm,
   std::optional<std::string> anacrusis,
-  bool allClefs,
-  bool grid,
-  bool retainChords,
-  bool splitPolyAsMonoTracksAndSaveNewFile);
+  const Flags& flags);
 
 // Used internally and for testing
 std::string OutputEvents(const Events& events, bool grid = false);

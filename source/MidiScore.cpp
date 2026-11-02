@@ -94,8 +94,9 @@ std::string OutputEvent(int& prevDuration, const Event& e)
 }
 
 std::string OutputTrack(
-  int tpq, Events& events, TimeSig ts, KeySig ks, bool debug, int numBars, 
-  bool yesDynamics, bool yesTimeSetEvents, int anacrusisTicks, bool allClefs, bool grid, bool poly)
+  int tpq, Events& events, TimeSig ts, KeySig ks, int numBars, 
+  bool yesDynamics, bool yesTimeSetEvents, int anacrusisTicks, 
+  const Flags& flags)
 {
   if (events.empty())
   {
@@ -104,7 +105,10 @@ std::string OutputTrack(
 
 //std::cout << "Raw events: " << OutputEvents(events) << "\n";
 
-  StaccatoPass(events); // identify staccato notes, TODO: if wanted
+  if (flags.stac)
+  {
+    StaccatoPass(events); // use staccato notation where possible.
+  }
 
   // Prepend time sig and key sig. TODO Later on consider looking for
   //  key sig changes, as we do for clefs.
@@ -118,7 +122,7 @@ std::string OutputTrack(
   // Reset last dynamics string output (on prev track)
   Dynamics::SetLastDynamicsString();
 
-  if (poly)
+  if (flags.poly)
     InsertChordMarkers(events);
   else
     ForceChordsToMono(events);
@@ -130,7 +134,7 @@ std::string OutputTrack(
 
   // Get initial clef event and possibly changes; interleave these events.
   ClefChanges allClefChanges;
-  GuessClef(events, tpq, anacrusisTicks, ts, allClefChanges, !allClefs);
+  GuessClef(events, tpq, anacrusisTicks, ts, allClefChanges, !flags.allClefs);
   InsertClefs(events, allClefChanges);
 
   // Fill 'gaps' between note events with rests
@@ -141,12 +145,12 @@ std::string OutputTrack(
     InsertTimeSetEvents(tpq, events);
 //std::cout << "With time sets: " << OutputEvents(events) << "\n";
 
-  if (debug)
+  if (flags.debug)
   {
     return OutputEventsDebug(tpq, events);
   }
 
-  return OutputEvents(events, grid);
+  return OutputEvents(events, flags.grid);
 }
 
 std::string OutputEventsDebug(int tpq, const Events& events)
@@ -406,13 +410,9 @@ std::string ToString(
   std::string timeSig, 
   std::optional<int> keySig,
   std::optional<std::string> quant, 
-  bool debug,
   std::optional<float> bpm,
   std::optional<std::string> anacrusis,
-  bool allClefs,
-  bool grid,
-  bool poly,
-  bool saveSplitPoly)
+  const Flags& flags)
 {
   TimeSig ts = GetTimeSigFromString(timeSig);
 
@@ -432,7 +432,7 @@ std::string ToString(
   // Unless --poly is specified, split poly tracks into multiple
   //  mono tracks. I.e. one track with a three note chord gets
   //  converted to three separate tracks. 
-  if (!poly)
+  if (!flags.poly)
   {
     int numNewTracks = MakeTrackMono(midifile, track, ts);
 
@@ -446,12 +446,13 @@ std::string ToString(
 
     // If this flag is specified, save the file with the extra mono
     //  tracks.
-    if (saveSplitPoly && numNewTracks > 0)
+    if (flags.saveSplitPoly && numNewTracks > 0)
     {
       // Save midifile with the new mono tracks
-      const std::string filename = "split_poly.mid";
+      const std::string filename = std::string(midifile.getFilename()) +
+        ".split_poly.mid";
       midifile.write(filename);
-      std::cout << "** Saved file with split poly->mono tracks: " 
+      std::cout << "// ** Saved file with split poly->mono tracks: " 
         << filename << "\n";
     }
   }
@@ -575,11 +576,13 @@ std::string ToString(
       anacrusisTicks);
     if (!events.empty()) 
     {
-      events = StripOrnamentsFromEvents(events, ornaments);
-
+      if (flags.detectOrnaments)
+      {
+        events = StripOrnamentsFromEvents(events, ornaments);
+      }
       res += "stave " + 
-        OutputTrack(tpq, events, ts, ks, debug, numBars, noDynamics, noTimeSets,
-          anacrusisTicks, allClefs, grid, poly) + "\n";
+        OutputTrack(tpq, events, ts, ks, numBars, noDynamics, noTimeSets,
+          anacrusisTicks, flags) + "\n";
     }
   }
   else
@@ -593,12 +596,14 @@ std::string ToString(
         anacrusisTicks);
       if (events.empty()) continue;
 
-      events = StripOrnamentsFromEvents(events, ornaments);
-
+      if (flags.detectOrnaments)
+      {
+        events = StripOrnamentsFromEvents(events, ornaments);
+      }
       res += "// ** STAVE " + std::to_string(stave++) + " **\n";
       res += "stave " + 
-        OutputTrack(tpq, events, ts, ks, debug, numBars, noDynamics, noTimeSets,
-          anacrusisTicks, allClefs, grid, poly) + "\n";
+        OutputTrack(tpq, events, ts, ks, numBars, noDynamics, noTimeSets,
+          anacrusisTicks, flags) + "\n";
     }
   }
 

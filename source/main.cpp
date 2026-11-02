@@ -27,6 +27,8 @@ static const auto ALL_CLEFS = "--allclefs";
 static const auto GRID = "--grid";
 static const auto POLY = "--poly";
 static const auto SPLITPOLY = "--splitpoly";
+static const auto STAC = "--stac";
+static const auto ORN = "--orn";
 
 static const auto USAGE_STRING = 
 R"(midiscore - convert midi file to juliet compact notation.
@@ -45,7 +47,7 @@ Options:
                   negative k is number of flats.
   --quant <q>   Quantise starts and durations, to resolution q.
                   q is one of: qqq, qq, q, c, m, sb, sb2, sb4
-  --debug       Verbose output for debugging
+  --debug       Verbose output for debugging.
   --bpm <f>     Set Beats Per Minute tempo: passed to MakeScore.
                   f is a number, can be fractional.
   --ana <a>     Anacrusis: set length of incomplete first bar.
@@ -55,6 +57,8 @@ Options:
   --poly        Retain chords; otherwise, highest pitch note only.
   --splitpoly   Save new version of midi file with polyphony split into
                   separate tracks.
+  --stac        Prefer staccato notation where possible.
+  --orn         Mark up ornaments (grace notes, trills, turns, mordents).
 )";
 
 static std::string NowToString()
@@ -110,8 +114,10 @@ int main(int argc, const char** argv)
     return 1;
   }
 
+  MidiScore::Flags flags;
+
   // All clefs option
-  const bool allClefs = check_flag(cl, ALL_CLEFS);
+  flags.allClefs = check_flag(cl, ALL_CLEFS);
 
   // Optional anacrusis bar length
   const auto optionalAna = cl.get_value<std::string>(ANA);
@@ -139,7 +145,7 @@ int main(int argc, const char** argv)
     }
   }
 
-  // Quantisation resolution.. default to qq.
+  // Quantisation resolution string.. default to "qq" if not given.
   auto quant = cl.get_value<std::string>(QUANT);
   if (!quant)
   {
@@ -158,16 +164,17 @@ int main(int argc, const char** argv)
       return 1;
     }
 
-    // Get quant resolution, defaultint to qq. We need this to get the
+    // Get quant resolution, default to qq. We need this to get the
     //  max duration for a note in an ornament.
     auto quantRes = MidiScore::GetTimeValFromString(*quant);
     if (quantRes == MidiScore::TimeVal::NONE)
     {
+      // Bad quant string, set default.
       quantRes = MidiScore::TimeVal::SEMIQUAVER;
     }
 
     std::cout << MidiScore::InfoString(
-      midifile, optionalTrack, optionalAna, optionalTimeSig, allClefs, quantRes);
+      midifile, optionalTrack, optionalAna, optionalTimeSig, flags.allClefs, quantRes);
     return 0;
   }
 
@@ -188,16 +195,22 @@ int main(int argc, const char** argv)
   const auto keySig = cl.get_value<int>(KEYSIG);
 
   // Debug option
-  const bool debug = check_flag(cl, DEBUG);
+  flags.debug = check_flag(cl, DEBUG);
 
   // Grid option
-  const bool grid = check_flag(cl, GRID);
+  flags.grid = check_flag(cl, GRID);
 
   // Poly option (if true, retain chords in track(s))
-  const bool poly = check_flag(cl, POLY);
+  flags.poly = check_flag(cl, POLY);
 
   // Split poly option (if true, save poly tracks as new mono tracks)
-  const bool splitpoly = check_flag(cl, SPLITPOLY);
+  flags.saveSplitPoly = check_flag(cl, SPLITPOLY);
+
+  // Staccato flag
+  flags.stac = check_flag(cl, STAC);
+
+  // Ornaments flag
+  flags.detectOrnaments = check_flag(cl, ORN);
 
   // BPM tempo -- passed through to MakeScore
   const auto bpm = cl.get_value<float>(BPM);
@@ -216,7 +229,10 @@ int main(int argc, const char** argv)
   }
 
   std::cout << MidiScore::ToString(
-    midifile, optionalTrack, *timeSig, keySig, quant, debug, bpm, optionalAna, allClefs, grid, poly, splitpoly);
+    midifile, optionalTrack, *timeSig, 
+    keySig, quant, bpm, optionalAna, 
+    flags);
 
   return 0;
 }
+
