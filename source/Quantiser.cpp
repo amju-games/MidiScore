@@ -66,6 +66,7 @@ void MonoQuantiser::SecondPass(Events& events) const
   }
 #endif
 
+#ifdef CHOP_BUT_NO_ZERO_LENGTH_NOTES
   // Option 2.
   // If note overlaps with previous, move it forward to the end
   //  of the prev note. Don't update its end time, and shorten
@@ -94,7 +95,29 @@ void MonoQuantiser::SecondPass(Events& events) const
       }
     }
   }
+#endif
 
+  // Option 3. 
+  // Chop notes to zero if necessary to avoid overlap.
+  int numEvents = events.size();
+  for (int i = 1; i < numEvents; ++i)
+  {
+    Event& prev = events[i-1];
+    Event& e = events[i];
+    if (e.IsNote() && prev.IsNote() && e.m_start < prev.m_end)
+    {
+      e.m_start = prev.m_end;
+      e.m_duration = e.m_end - e.m_start;
+    }
+  }
+  // Remove zero-duration notes
+  events.erase(
+    std::remove_if(events.begin(), events.end(),
+    [](const Event& e) 
+    { 
+      return e.IsNote() && e.m_duration == 0; 
+    }),
+    events.end());
 }
 }
 
