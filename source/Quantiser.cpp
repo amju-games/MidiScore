@@ -43,8 +43,58 @@ void MonoQuantiser::QuantiseDuration(int tpq, Event& e) const
   //e.SetTimeVal(tpq); 
 }
 
-void MonoQuantiser::SecondPass([[maybe_unused]] Events& events) const
+void MonoQuantiser::SecondPass(Events& events) const
 {
+  // Make sure there are no overlapping events
+#ifdef SHUNT_FORWARD
+  // Option 1. 
+  // If a note overlaps with previous note, shunt it forward to
+  //  the end of the prev note; update its end time, but don't 
+  //  change its duration. This tends to increase the length of 
+  //  the song, as all notes can ripple forward until there is 
+  //  a sufficiently long rest.
+  int numEvents = events.size();
+  for (int i = 1; i < numEvents; ++i)
+  {
+    Event& prev = events[i-1];
+    Event& e = events[i];
+    if (e.IsNote() && prev.IsNote() && e.m_start < prev.m_end)
+    {
+      e.m_start = prev.m_end;
+      e.m_end = e.m_start + e.m_duration;
+    }
+  }
+#endif
+
+  // Option 2.
+  // If note overlaps with previous, move it forward to the end
+  //  of the prev note. Don't update its end time, and shorten
+  //  its duration.
+  // This can cause some notes to have zero length. 
+  // So, if the new duration is zero, then increase its duration
+  //  and update end time.
+  int numEvents = events.size();
+  for (int i = 1; i < numEvents; ++i)
+  {
+    Event& prev = events[i-1];
+    Event& e = events[i];
+    if (e.IsNote() && prev.IsNote() && e.m_start < prev.m_end)
+    {
+      e.m_start = prev.m_end;
+      auto newDuration = e.m_end - e.m_start;
+      if (newDuration == 0)
+      {
+        // Don't chop note to zero duration, so increase its end time.
+        e.m_end = e.m_start + e.m_duration;
+      }
+      else
+      {
+        // New duration is fine.
+        e.m_duration = newDuration;
+      }
+    }
+  }
+
 }
 }
 

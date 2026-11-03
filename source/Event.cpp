@@ -888,6 +888,9 @@ void ForceChordsToMono(Events& events)
       // Mark all notes after the first
       for (auto j = firstNote + 1; j != events.end() && j != it; j++)
       {
+        std::cout << "// ForceMono: flagging note as a grace note! " 
+          << j->ToString() 
+          << "\n";
         j->m_isGraceNote = true;
       }
 
