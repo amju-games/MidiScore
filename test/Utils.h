@@ -14,5 +14,7 @@ Event r(int start, int duration, int tpq);
 
 // Create a barline event
 Event barline(int start, int tpq);
+
+Event tie(int start);
 }
 

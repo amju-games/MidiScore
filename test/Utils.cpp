@@ -40,5 +40,15 @@ Event barline(int start, int tpq)
   e.SetTimeVal(tpq);
   return e;
 }
+
+Event tie(int start)
+{
+  Event e;
+  e.m_type = EventType::TIE;
+  e.m_start = start;
+  e.m_duration = 0; 
+  e.m_end = start + e.m_duration;
+  return e;
+}
 }
 

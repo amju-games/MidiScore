@@ -58,3 +58,40 @@ TEST_CASE("Find staccato notes", "[Staccato]")
   REQUIRE(!events[2].m_isStacc);
 }
 
+TEST_CASE("Not allowed on RHS of tie", "[Staccato]")
+{
+  using namespace MidiScore;
+
+  const int tpq = 4; // ticks per quarter note
+  Events events
+  { 
+    // pitch, start, duration, tpq
+    n(60, 0, 2, tpq), // q 
+    // Gap, same len as note 60
+    n(62, 4, 2, tpq), // q 
+    tie(6),
+    n(62, 6, 2, tpq), // q 
+    // Gap, same len as note above
+    n(64, 10, 2, tpq), // q 
+    // Last note can't be flagged as stacc as no gap after.
+  };
+
+  int numStacc = StaccatoPass(events);
+
+  std::cout << OutputEvents(events) << "\n";
+
+  REQUIRE(numStacc == 1);
+  REQUIRE(events[0].m_isStacc);
+  // Time val of note doubled, so there won't be a rest in between.
+  REQUIRE(events[0].GetTimeVal() == TimeVal::CROTCHET);
+
+  // We don't allow notes of duration minim or above to be stac.
+  REQUIRE(!events[1].m_isStacc);
+  // Time val of note is not doubled as we aren't allowing stac minim.
+  REQUIRE(events[1].GetTimeVal() == TimeVal::QUAVER);
+
+  REQUIRE(events[2].IsTie());
+
+  REQUIRE(!events[3].m_isStacc); // on rhs of tie
+}
+
