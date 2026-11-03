@@ -494,24 +494,8 @@ std::string ToString(
   //  are no chords, then add a different impl later when required.
   const Quantiser& quantiser = MakeQuantiser(quantRes); 
 
-  midifile.doTimeAnalysis();
-  midifile.linkNotePairs();
-
   int anacrusisTicks = GetAnacrusisTicks(anacrusis, tpq); 
   // number of tpq ticks in first, incomplete bar
-
-  if (anacrusis)
-  { 
-     auto timeval = GetTimeValFromString(*anacrusis);
-     // Assume anacrusis string is error checked in main() ?
-     if (timeval == TimeVal::NONE)
-     {
-       std::cout << "Bad anacrusis duration.\n";
-       return {};
-     }
-     // TODO This function doesn't handle dots, it's just a lookup
-     anacrusisTicks = CalcTpqMultipleForTimeVal(tpq, timeval);
-  }
 
   // First pass: Join all tracks 
   midifile.joinTracks(); 

@@ -17,7 +17,8 @@ int GetAnacrusisTicks(std::optional<std::string> anacrusis, int tpq)
        return 0;
      }
      // TODO This function doesn't handle dots, it's just a lookup
-     anacrusisTicks = CalcTpqMultipleForTimeVal(tpq, timeval);                   }
+     anacrusisTicks = CalcTpqMultipleForTimeVal(tpq, timeval);  
+  }
   return anacrusisTicks;
 }
 }
