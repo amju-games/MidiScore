@@ -13,8 +13,17 @@ int StaccatoPass(Events& events)
   int n = static_cast<int>(events.size());
   for (int i = 0; i < n - 1; i++)
   {
+    // Note on the rhs of a tie isn't staccato.
+    if (i > 0 &&  events[i - 1].IsTie()) continue;
+
     Event& e = events[i];
     if (!e.IsNote()) continue;
+
+    // Don't make anything above a crotchet staccato.
+    // So if this timeval is a quaver, that could be a stac crotchet.
+    // But if this timeval is a crotchet, that would be a stac minim.
+    if (static_cast<int>(e.m_timeVal) >= 
+        static_cast<int>(TimeVal::CROTCHET)) continue;
 
     const Event& next = events[i + 1];
     if (!next.IsNote()) continue;

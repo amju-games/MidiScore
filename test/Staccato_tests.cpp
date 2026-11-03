@@ -45,14 +45,15 @@ TEST_CASE("Find staccato notes", "[Staccato]")
 
   std::cout << OutputEvents(events) << "\n";
 
-  REQUIRE(numStacc == 2);
+  REQUIRE(numStacc == 1);
   REQUIRE(events[0].m_isStacc);
   // Time val of note doubled, so there won't be a rest in between.
   REQUIRE(events[0].GetTimeVal() == TimeVal::CROTCHET);
 
-  REQUIRE(events[1].m_isStacc);
-  // Time val of note doubled, so there won't be a rest in between.
-  REQUIRE(events[1].GetTimeVal() == TimeVal::MINIM);
+  // We don't allow notes of duration minim or above to be stac.
+  REQUIRE(!events[1].m_isStacc);
+  // Time val of note is not doubled as we aren't allowing stac minim.
+  REQUIRE(events[1].GetTimeVal() == TimeVal::CROTCHET);
 
   REQUIRE(!events[2].m_isStacc);
 }
