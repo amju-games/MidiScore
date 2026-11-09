@@ -27,6 +27,76 @@
 
 namespace MidiScore
 {
+static Event MakeOrnamentEvent(const Ornament& o)
+{
+  Event e;
+  e.m_type = EventType::ORNAMENT;
+  e.m_ornament = o;
+  e.m_start = o.m_start;
+  e.m_end = e.m_start;
+  return e;
+}
+
+// Splice the given ornaments into the given event sequence.
+static void AddOrnaments(
+  Events& events,
+  std::vector<OrnamentCounts> ornaments)
+{
+  // Ornaments are split by bar
+  int barNum = 1;
+
+  // Good news, events and ornaments are both sorted by start time.
+  // So once we find an event, we can search from there to find the
+  //  next one.
+  Events::iterator searchBegin = events.begin();
+
+  for (const auto& barOrnaments : ornaments)
+  {
+    for (const Ornament& o : barOrnaments.allOrnaments)
+    {
+      // Find spot to insert ornament o
+      Events::iterator it = std::upper_bound(
+        searchBegin, events.end(),
+        o.m_start, 
+        [](int start, const Event& e) 
+        { 
+          return start < e.m_start; 
+        });
+
+      std::cout << "// Insert " 
+        << o.ToString(KeySig::KS_SHARP_0) 
+        << " (time " << o.m_start
+        << ") at event: " << it->ToString()
+        << " in bar " << barNum
+        << "\n";
+
+      searchBegin = events.insert(it, MakeOrnamentEvent(o));
+    }
+    ++barNum;
+  }
+}
+
+static bool MidiNoteIsInOrnament(const smf::MidiEvent& mev,
+  const std::vector<OrnamentCounts>& ornaments)
+{
+  if (!mev.isNoteOn()) return false;
+
+  for (const OrnamentCounts& oc : ornaments)
+  {
+    const OrnamentVec& allOrns = oc.allOrnaments;
+    for (const Ornament& o : allOrns)
+    {
+      if (mev.tick >= o.m_start && mev.tick <= o.m_end)
+      {
+        // Tick for this event is within the time range of
+        //  ornament o.
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 static void AddEventToVec(
   int tpq, const smf::MidiEvent& mev, Events& events, TimeSig ts, 
   KeySig ks,
@@ -96,7 +166,8 @@ std::string OutputEvent(int& prevDuration, const Event& e)
 std::string OutputTrack(
   int tpq, Events& events, TimeSig ts, KeySig ks, int numBars, 
   bool yesDynamics, bool yesTimeSetEvents, int anacrusisTicks, 
-  const Flags& flags)
+  const Flags& flags,
+  const std::vector<OrnamentCounts>& ornaments)
 {
   if (events.empty())
   {
@@ -122,10 +193,9 @@ std::string OutputTrack(
   // Reset last dynamics string output (on prev track)
   Dynamics::SetLastDynamicsString();
 
+  // If polyphonic tracks are required, mark up chords in the track.
   if (flags.poly)
     InsertChordMarkers(events);
-  else
-    ForceChordsToMono(events);
 
 //std::cout << "With chord markers: " << OutputEvents(events) << "\n";
 
@@ -144,6 +214,9 @@ std::string OutputTrack(
   if (yesTimeSetEvents)
     InsertTimeSetEvents(tpq, events);
 //std::cout << "With time sets: " << OutputEvents(events) << "\n";
+
+  // Splice ornaments back into events
+  AddOrnaments(events, ornaments);
 
   if (flags.debug)
   {
@@ -257,15 +330,30 @@ void GuessTimeSigAndKeySig(int tpq, const Events& events, TimeSig& ts, KeySig& k
 Events GetEventsFromTrack(
   int tpq, const smf::MidiEventList& track, TimeSig ts, KeySig ks, 
   const Quantiser& quantiser,
-  int anacrusisTicks)
+  int anacrusisTicks,
+  const std::vector<OrnamentCounts>& ornaments)
 {
   Events events;
-  
+  int numStripped = 0;
+
   for (int event = 0; event < track.size(); event++) 
   {
-    AddEventToVec(tpq, track[event], events, ts, ks, quantiser, anacrusisTicks);
+    const auto& mev = track[event];
+
+    // Don't add notes that are part of an ornament
+    if (MidiNoteIsInOrnament(mev, ornaments))
+    {
+      ++numStripped;
+    }
+    else
+    {
+      AddEventToVec(tpq, mev, events, ts, ks, quantiser, anacrusisTicks);
+    }
   }   
   
+//  std::cout << "Stripped " << numStripped 
+//    << " out of " << track.size() << " events.\n";
+
   if (events.empty()) return events;
 
   // Sort by ascending start time, to minimise number of time jumps 
@@ -328,59 +416,6 @@ static int MakeTrackMono(
     }
     return res;
   }
-}
-
-// Remove the grace notes with given positions from the given events.
-static void StripGraceNotes(Events& res, int barNum, const Positions& positions)
-{
-  for (auto position : positions)
-  {
-    int start = position.first;
-    [[maybe_unused]]int end = position.second;
-    // start, end are time ticks
-//    std::cout << "Looking for grace note at " << start << "-" << end << "...\n";
-    // Find the event with the closest start time
-    auto it = std::min_element(res.begin(), res.end(), 
-      [start](const Event& a, const Event& b)
-      {
-        return std::abs(a.m_start - start) < std::abs(b.m_start - start);
-      }
-    );
-    if (it != res.end())
-    {
-      // TODO Check the end of the original reported grace note and
-      //  the event we have found.
-
-      // We can see the actual result so silencing this
- //     std::cout << "Removing grace note: " << it->ToString() 
- //       << " in bar " << barNum << "\n";
-      //res.erase(it);
-
-      // TODO Insert marker: retain info about this grace note:
-      //  we need the pitch, so we should change the type of this
-      //  event from note to grace note, rather than erasing it.
-      it->m_isGraceNote = true;
-    }
-  }
-}
-
-// Find closest events to the reported ornaments and strip them
-//  out, depending on ornament type.
-static Events StripOrnamentsFromEvents(
-  const Events& constevents,
-  std::vector<OrnamentCounts> allOrnaments)
-{
-  auto res(constevents);
-  // Ornaments are split by bar
-  int barNum = 1;
-  for (const auto& bar : allOrnaments)
-  {
-    // For each type, find matching Events and remove them as appropriate.
-    StripGraceNotes(res, barNum, bar.grace_notes);
-    ++barNum;
-  }
-
-  return res;
 }
 
 static std::vector<OrnamentCounts> FindOrnaments(
@@ -476,6 +511,21 @@ std::string ToString(
       << (tpq / ornamentDurationTicks) << " crotchet)\n";
 
     ornaments = FindOrnaments(midifile, *track, ts, ornamentDurationTicks);
+/*
+    std::cout << "Ornamentation:\n";
+    for (int i = 0; i < ornaments.size(); ++i)
+    {
+      if (ornaments[i].total() > 0)
+      {
+        std::cout 
+          << "\tBar " 
+          << i + 1 
+          << ": " 
+          << ornaments[i].ToString() 
+          << "\n";
+      }
+    }
+*/
     int numOrnaments = 0;
     for (const auto& b : ornaments)
     {
@@ -500,7 +550,8 @@ std::string ToString(
   // First pass: Join all tracks 
   midifile.joinTracks(); 
   Events allEvents = GetEventsFromTrack(
-    tpq, midifile[0], ts, KeySig::KS_SHARP_0, quantiser, anacrusisTicks);
+    tpq, midifile[0], ts, KeySig::KS_SHARP_0, quantiser, anacrusisTicks,
+    ornaments);
 
   if (allEvents.empty())
   {
@@ -550,45 +601,37 @@ std::string ToString(
   //  as a separate stave  
   midifile.splitTracks();
 
+  // TODO These should go in flags
   const bool noDynamics = false;
   const bool noTimeSets = false;
 
   // If track is specified, just output that one track.
+  // Otherwise, output all non-empty tracks.
+  int numTracks = midifile.getNumTracks();
+  int start = 0;
+  int end = numTracks;
   if (track)
   {
-    Events events = GetEventsFromTrack(tpq, midifile[*track], ts, ks, quantiser,
-      anacrusisTicks);
-    if (!events.empty()) 
-    {
-      if (flags.detectOrnaments)
-      {
-        events = StripOrnamentsFromEvents(events, ornaments);
-      }
-      res += "stave " + 
-        OutputTrack(tpq, events, ts, ks, numBars, noDynamics, noTimeSets,
-          anacrusisTicks, flags) + "\n";
-    }
+    start = *track;
+    end = start + 1;
   }
-  else
-  {
-    // Output all non-empty tracks.
-    int stave = 0;
-    int numTracks = midifile.getNumTracks();
-    for (int t = 0; t < numTracks; t++)
-    {
-      Events events = GetEventsFromTrack(tpq, midifile[t], ts, ks, quantiser,
-        anacrusisTicks);
-      if (events.empty()) continue;
 
-      if (flags.detectOrnaments)
-      {
-        events = StripOrnamentsFromEvents(events, ornaments);
-      }
-      res += "// ** STAVE " + std::to_string(stave++) + " **\n";
-      res += "stave " + 
-        OutputTrack(tpq, events, ts, ks, numBars, noDynamics, noTimeSets,
-          anacrusisTicks, flags) + "\n";
-    }
+  int stave = 0;
+  for (int t = start; t < end; t++)
+  {
+    Events events = GetEventsFromTrack(
+      tpq, midifile[t], ts, ks, quantiser,
+      anacrusisTicks,
+      ornaments);
+
+    // TODO Fix Multi-track output and ornaments
+
+    if (events.empty()) continue;
+
+    res += "// ** STAVE " + std::to_string(stave++) + " **\n";
+    res += "stave " + 
+      OutputTrack(tpq, events, ts, ks, numBars, noDynamics, noTimeSets,
+        anacrusisTicks, flags, ornaments) + "\n";
   }
 
   res += "\n";

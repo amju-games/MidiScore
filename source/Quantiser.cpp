@@ -45,6 +45,9 @@ void MonoQuantiser::QuantiseDuration(int tpq, Event& e) const
 
 void MonoQuantiser::SecondPass(Events& events) const
 {
+  // What to do if we want a mono track but there are overlaps?
+  // None of the options below are super appealing.
+
   // Make sure there are no overlapping events
 #ifdef SHUNT_FORWARD
   // Option 1. 
@@ -52,7 +55,7 @@ void MonoQuantiser::SecondPass(Events& events) const
   //  the end of the prev note; update its end time, but don't 
   //  change its duration. This tends to increase the length of 
   //  the song, as all notes can ripple forward until there is 
-  //  a sufficiently long rest.
+  //  a sufficiently long rest to absorb.
   int numEvents = events.size();
   for (int i = 1; i < numEvents; ++i)
   {
@@ -97,6 +100,7 @@ void MonoQuantiser::SecondPass(Events& events) const
   }
 #endif
 
+#ifdef CHOP_NOTES_TO_ZERO
   // Option 3. 
   // Chop notes to zero if necessary to avoid overlap.
   int numEvents = events.size();
@@ -118,6 +122,7 @@ void MonoQuantiser::SecondPass(Events& events) const
       return e.IsNote() && e.m_duration == 0; 
     }),
     events.end());
+#endif
 }
 }
 

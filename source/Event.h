@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "Dynamics.h"
+#include "Ornament.h"
 #include "TimeVal.h"
 
 namespace MidiScore
@@ -16,10 +17,17 @@ enum class TimeSig;
 
 enum class EventType
 {
-  NOTE, REST, BARLINE, TIE, CHORD_START, CHORD_END, TIME_SET,
+  NOTE, 
+  REST, 
+  BARLINE, 
+  TIE, 
+  CHORD_START, 
+  CHORD_END, 
+  TIME_SET,
   CLEF,
   KEY_SIG,
-  TIME_SIG
+  TIME_SIG,
+  ORNAMENT
 };
 
 struct Event
@@ -46,8 +54,8 @@ struct Event
   
   EventType m_type = EventType::NOTE;
 
-  // Ornamentation: 
-  bool m_isGraceNote = false;
+  // If ornament type, this struct has the info.
+  Ornament m_ornament;
 
   Clef m_clef; // for clef events; initialised in ctor
   TimeSig m_timeSig; // for time sig events
@@ -71,7 +79,7 @@ struct Event
   bool IsClef() const { return m_type == EventType::CLEF; }
   bool IsKeySig() const { return m_type == EventType::KEY_SIG; }
   bool IsTimeSig() const { return m_type == EventType::TIME_SIG; }
-  bool IsOrnament() const { return m_isGraceNote; }
+  bool IsOrnament() const { return m_type == EventType::ORNAMENT; }
 };
 
 using Events = std::vector<Event>;
@@ -117,9 +125,6 @@ void InsertBarLines(int tpq, TimeSig ts, Events& events, int numBars, int anacru
 
 // For poly tracks, detect chords and put chord markers ( ) around them.
 void InsertChordMarkers(Events& events);
-
-// For mono tracks, anything that would be a chord gets forced to mono. 
-void ForceChordsToMono(Events& events);
 
 void InsertTimeSetEvents(int tpq, Events& events);
 

@@ -1,5 +1,7 @@
 #include <iostream>
+#include "KeySig.h"
 #include "Ornament.h"
+#include "Pitch.h"
 
 namespace MidiScore
 {
@@ -10,16 +12,16 @@ int GetOrnamentNoteMaxTicks(int tpq, TimeVal quant)
   //  is a grace note? Maybe we want m * 2 / 3.
   return m / 2; // Half
 //  return m * 2 / 3; // Two-thirds?
-  return m * 3 / 4; // Three quarters?!
+//  return m * 3 / 4; // Three quarters?!
 }
 
 int OrnamentCounts::total() const
 {
-  return static_cast<int>(
-    grace_notes.size() + trills.size() + mordents.size() + turns.size());
+  return static_cast<int>(allOrnaments.size());
+    //grace_notes.size() + trills.size() + mordents.size() + turns.size());
 }
 
-std::string Stringify(const Positions& p, const std::string& s)
+static std::string Stringify(const OrnamentVec& p, const std::string& s)
 {
   auto n = p.size();
   if (n == 0) return "";
@@ -30,7 +32,10 @@ std::string OrnamentCounts::ToString() const
 {
   std::string res;
 
-  res += Stringify(grace_notes, "grace note");
+  //res += Stringify(allOrnaments, "ornament");
+
+  res += Stringify(graceNotes, "grace note");
+  res += Stringify(graceRuns, "grace run");
   res += Stringify(trills, "trill");
   res += Stringify(mordents, "mordent");
   res += Stringify(turns, "turn");
@@ -47,6 +52,11 @@ std::vector<OrnamentCounts> OrnamentAnalyzer::GetOrnamentationPerBar(
     //  in ticks.
     int maxOrnamentNoteDurationTicks)
 {
+  // Calc max gap between notes in ticks:  a fraction of 
+  //  maxOrnamentNoteDurationTicks.
+  const int maxGap = maxOrnamentNoteDurationTicks / 4;
+//  std::cout << "Max gap: " << maxGap << "\n";
+
     std::vector<OrnamentCounts> barReports(totalBars);
 
     if (trackIndex < 0 || trackIndex >= midifile.getTrackCount()) 
@@ -59,7 +69,8 @@ std::vector<OrnamentCounts> OrnamentAnalyzer::GetOrnamentationPerBar(
     std::vector<Note> notes = extractNotes(track);
 
     size_t i = 0;
-    while (i < notes.size()) {
+    while (i < notes.size()) 
+    {
         //double dur = notes[i].end_time - notes[i].start_time;
         int durTicks = notes[i].end_tick - notes[i].start_tick;
 
@@ -71,32 +82,52 @@ std::vector<OrnamentCounts> OrnamentAnalyzer::GetOrnamentationPerBar(
 
         // Group consecutive short notes
         size_t seqEnd = i;
-        while (seqEnd + 1 < notes.size()) {
+        while (seqEnd + 1 < notes.size()) 
+        {
             //double nextDur = notes[seqEnd + 1].end_time - notes[seqEnd + 1].start_time;
             int nextDurTicks = notes[seqEnd + 1].end_tick - notes[seqEnd + 1].start_tick;
             // Extended max duration: after the first short note, 
             //  subsequent notes in the ornament can be longer. 
-            int extMaxDuration = maxOrnamentNoteDurationTicks * 3 / 2;
-            // TODO Gap is still in absolute seconds... 
-            double gap = notes[seqEnd + 1].start_time - notes[seqEnd].end_time;
+            int extMaxDuration = maxOrnamentNoteDurationTicks; // * 3 / 2;
+            //double gap = notes[seqEnd + 1].start_time - notes[seqEnd].end_time;
+            int gap = notes[seqEnd + 1].start_tick - notes[seqEnd].end_tick;
 
-            if (nextDurTicks < extMaxDuration && gap < 0.05) {
+            if (nextDurTicks < extMaxDuration && gap < maxGap) 
+            {
                 seqEnd++;
             } else {
                 break;
             }
         }
 
-        OrnamentType type = classifySequence(notes, i, seqEnd, maxOrnamentNoteDurationTicks);
+        OrnamentType type = classifySequence(notes, i, seqEnd, maxOrnamentNoteDurationTicks, maxGap);
 
+        // Classifying weeds out quick notes that are not grace notes
+        //  (staccato notes).
         if (type != OrnamentType::None) {
-            int barIndex = notes[i].start_tick / ticksPerBar;
-            if (barIndex >= 0 && barIndex < totalBars) 
-            {
-                int start = notes[i].start_tick;
-                int end = notes[i].end_tick;
-                recordOrnament(barReports[barIndex], type, start, end);
-            }
+            // round() here didn't improve the situation.
+            int barIndex = static_cast<int>(std::floor(
+                  static_cast<float>(notes[i].start_tick) / 
+                  static_cast<float>(ticksPerBar)));
+            barIndex = std::clamp(barIndex, 0, totalBars - 1);
+            assert(barIndex >= 0 && barIndex < totalBars);
+
+            int start = notes[i].start_tick;
+            int end = notes[seqEnd].end_tick;
+            PitchVec pitches;
+            for (int j = i; j <= seqEnd; ++j) pitches.push_back(notes[j].pitch);
+/*
+            std::cout << "Found an ornament: bar: " << barIndex + 1
+              << " start: "
+              << start << " end: " << end 
+              << " pitches: ";
+            for (int p : pitches) 
+              std::cout << PitchToString(p, KeySig::KS_SHARP_0) << " ";
+            std::cout << "type: " << static_cast<int>(type) << "\n";
+*/
+            recordOrnament(barReports[barIndex], type, start, end,
+                pitches);
+            
             i = seqEnd + 1; // Skip past identified ornament
         } else {
             i++;
@@ -106,11 +137,22 @@ std::vector<OrnamentCounts> OrnamentAnalyzer::GetOrnamentationPerBar(
     return barReports;
 }
 
+std::string Ornament::ToString(KeySig ks) const
+{
+  std::string res =  "<qq_grace> "; // TODO 
+
+  for (int p : m_pitches) 
+    res += PitchToString(p, ks) + " ";
+
+  return res;
+}
+
 OrnamentType OrnamentAnalyzer::classifySequence(
     const std::vector<Note>& notes,
     size_t start,
     size_t end,
-    int maxGraceDurationTicks)
+    int maxGraceDurationTicks,
+    int maxGap)
 {
     size_t count = end - start + 1;
 
@@ -120,7 +162,7 @@ OrnamentType OrnamentAnalyzer::classifySequence(
             int pitchDiff = std::abs(notes[start].pitch - notes[start + 1].pitch);
             //double timeToNext = notes[start + 1].start_time - notes[start].start_time;
             int timeToNextTicks = notes[start + 1].start_tick - notes[start].start_tick;
-            if (pitchDiff <= 2 && timeToNextTicks <= maxGraceDurationTicks) {
+            if (pitchDiff <= 2 && timeToNextTicks <= maxGap) {
                 return OrnamentType::GraceNote;
             }
         }
@@ -177,7 +219,73 @@ OrnamentType OrnamentAnalyzer::classifySequence(
         }
     }
 
-    return OrnamentType::None;
+    // Not one of the above, but some kind of run of grace notes.
+    return OrnamentType::GraceRun;
+}
+
+void OrnamentAnalyzer::recordOrnament(
+    OrnamentCounts& counts,
+    OrnamentType type, int start, int end,
+    PitchVec pitches)
+{
+    if (type == OrnamentType::None) return;
+
+    counts.allOrnaments.emplace_back(Ornament(start, end, pitches, 
+      type));
+
+    // Split by type for testing
+    switch (type) {
+        case OrnamentType::GraceNote:
+          counts.graceNotes.emplace_back(Ornament(start, end, pitches, 
+              OrnamentType::GraceNote));
+          break;
+
+        case OrnamentType::GraceRun:
+          counts.graceRuns.emplace_back(Ornament(start, end, pitches, 
+              OrnamentType::GraceRun));
+          break;
+
+        case OrnamentType::Trill:
+          counts.trills.emplace_back(Ornament(start, end, pitches,
+              OrnamentType::Trill));
+          break;
+
+        case OrnamentType::Mordent:
+          counts.mordents.emplace_back(Ornament(start, end, pitches,
+              OrnamentType::Mordent));
+          break;
+
+        case OrnamentType::Turn:
+          counts.turns.emplace_back(Ornament(start, end, pitches,
+              OrnamentType::Turn));
+          break;
+
+        default: break;
+    }
+}
+
+std::vector<OrnamentAnalyzer::Note> 
+OrnamentAnalyzer::extractNotes(smf::MidiEventList& track)
+{
+    std::vector<Note> notes;
+    track.linkNotePairs();
+
+    for (int i = 0; i < track.size(); ++i) {
+        smf::MidiEvent& ev = track[i];
+        if (ev.isNoteOn() && ev.isLinked()) {
+            smf::MidiEvent* offEv = ev.getLinkedEvent();
+            notes.push_back({
+                ev.getKeyNumber(),
+                ev.getVelocity(),
+                ev.getChannel(),
+                ev.tick,
+                offEv->tick,
+                ev.seconds,
+                offEv->seconds
+            });
+        }
+    }
+    return notes;
 }
 }
 

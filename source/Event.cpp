@@ -296,10 +296,6 @@ std::string Event::NoteToStringNoDuration() const
   assert(m_type == EventType::NOTE);
 
   std::string res;
-  if (m_isGraceNote)
-  {
-    res += "{ gr ";
-  }
 
   // Dynamics refer to the last note, so pitch comes first.
 
@@ -317,11 +313,6 @@ std::string Event::NoteToStringNoDuration() const
   {
     res += " " + d;
   }
-  // TODO also articulation
-  if (m_isGraceNote)
-  {
-    res += " }";
-  }
 
   return res;
 }
@@ -335,6 +326,9 @@ std::string Event::ToString() const
 {
   switch (m_type)
   {
+  case EventType::ORNAMENT:
+    return m_ornament.ToString(m_keySig);
+
   case EventType::REST:
     if (m_isWholeBar) return "<" + DurationString() + "> R";
     return "<" + DurationString() + "> r";
@@ -842,66 +836,6 @@ void InsertBarLines(int tpq, TimeSig ts, Events& events, int numBars,
 
   // Add final bar lines
   AddFinalBarLines(numBars, bar, events, ticksForOneBar, anacrusisTicks);
-}
-
-void ForceChordsToMono(Events& events)
-{
-  // For monophonic output, don't output chord markers.
-  // Instead, one of the notes in the chord is retained, while the
-  //  others are flagged as ornamentation.
-  // We keep the note with the longest duration.
-
-  // Look for notes with the same start time.
-  for (auto it = events.begin() + 1; it != events.end(); ++it)
-  {
-    if (!it->IsNote()) continue;
-    if (!(it - 1)->IsNote()) continue;
-
-    // Ornaments (grace notes etc) look like chords but are not!
-    if (it->IsOrnament() || (it - 1)->IsOrnament()) continue;
-
-    assert(it != events.end());
-    assert((it - 1) != events.end());
-
-    int start = (it - 1)->m_start; 
-    
-    if (start == it->m_start)
-    {
-      auto firstNote = it - 1;
-      assert(firstNote != events.end());
-//      std::cout << "Found chord: " << firstNote->ToString() << "\n";
-
-      // Find all events with the same start time      
-      // Store start of notes in chord
-      while (it != events.end() && it->m_start == start)
-      {
-        ++it;
-      }
-
-      // Sort the notes in the chord, longest duration first.
-      std::sort(firstNote, it,
-        [](const Event& e1, const Event& e2)
-        {
-          return e2.m_duration < e1.m_duration; // descending order
-        }
-      );
-      // Mark all notes after the first
-      for (auto j = firstNote + 1; j != events.end() && j != it; j++)
-      {
-        std::cout << "// ForceMono: flagging note as a grace note! " 
-          << j->ToString() 
-          << "\n";
-        j->m_isGraceNote = true;
-      }
-
-      if (it == events.end())
-      {
-        // We could already be at the end, in which case the loop 
-        //  increment will push us over the edge!
-        break;
-      }
-    }
-  }
 }
 
 void InsertChordMarkers(Events& events)

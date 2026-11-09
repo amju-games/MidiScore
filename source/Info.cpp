@@ -297,7 +297,8 @@ static Events GetPitchEventsFromTrack(const smf::MidiEventList& track)
   const int ANACRUSIS_TICKS = 0; // we don't care about timing
   return GetEventsFromTrack(
     TPQ, track, TimeSig::TS_NONE, KeySig::KS_SHARP_0, NullQuantiser(),
-    ANACRUSIS_TICKS);
+    ANACRUSIS_TICKS,
+    {});
 }
 
 static int CountNoteOnEventsInTrack(const smf::MidiEventList& track)

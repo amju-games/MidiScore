@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include "Event.h"
+#include "Ornament.h"
 
 namespace smf
 {
@@ -74,7 +75,8 @@ class Quantiser;
 Events GetEventsFromTrack(
   int tpq, const smf::MidiEventList& track, TimeSig ts, KeySig ks,
   const Quantiser& quantiser,
-  int anacrusisTicks);
+  int anacrusisTicks,
+  const std::vector<OrnamentCounts>& ornaments);
 
 // Output one event. 
 // The idea is to only output duration elements when the duration
