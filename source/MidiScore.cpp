@@ -160,6 +160,11 @@ std::string OutputEvent(int& prevDuration, const Event& e)
     prevDuration = e.m_duration;
   }
 
+  if (e.IsOrnament())
+  {
+    prevDuration = -1; 
+  }
+
   return e.ToString();
 }
 
