@@ -18,7 +18,9 @@ void appendTestNote(smf::MidiFile& midi, int track, int pitch, double startTimeS
     midi[track].append(off);
 }
 
-TEST_CASE("OrnamentAnalyzer: Comprehensive multi-bar ornament detection", "[OrnamentAnalyzer]") {
+TEST_CASE("OrnamentAnalyzer: multi-bar ornament detection", 
+    "[OrnamentAnalyzer]") 
+{
     smf::MidiFile midi;
     const int tpq = 480;
     midi.setTicksPerQuarterNote(tpq);
@@ -66,7 +68,8 @@ TEST_CASE("OrnamentAnalyzer: Comprehensive multi-bar ornament detection", "[Orna
     midi.sortTrack(0);
 
     int maxOrnTicks = tpq / 4; // qq
-    auto reports = OrnamentAnalyzer::GetOrnamentationPerBar(midi, 0, 4, ticksPerBar, maxOrnTicks);
+    int maxGapTicks = maxOrnTicks / 2;
+    auto reports = OrnamentAnalyzer::GetOrnamentationPerBar(midi, 0, 4, ticksPerBar, maxOrnTicks, maxGapTicks);
 
     REQUIRE(reports.size() == 4);
 
@@ -77,7 +80,7 @@ TEST_CASE("OrnamentAnalyzer: Comprehensive multi-bar ornament detection", "[Orna
 
     // Bar 1: Multiple ornaments
     SECTION("Bar 1 contains 1 Grace Note and 1 Mordent") {
-        CHECK(reports[1].grace_notes.size() == 1);
+        CHECK(reports[1].graceNotes.size() == 1);
         CHECK(reports[1].mordents.size() == 1);
         CHECK(reports[1].total() == 2);
     }

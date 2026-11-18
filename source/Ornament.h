@@ -72,13 +72,16 @@ public:
     // maxOrnNoteDurTicks: 
     // Maximum duration for a note to be considered part of an ornament,
     //  in ticks.
+    // maxGapTicks:
+    // Max gap between notes to be considered part of an ornament.
     // Outputs a report of the positions of each ornament found.
     static std::vector<OrnamentCounts> GetOrnamentationPerBar(
         smf::MidiFile& midifile,
         int trackIndex,
         int totalBars,
         int ticksPerBar,
-        int maxOrnNoteDurTicks);
+        int maxOrnNoteDurTicks,
+        int maxGapTicks);
 
     struct Note {
         int pitch;

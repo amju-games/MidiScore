@@ -1,4 +1,4 @@
-all:makescore_exe
+all:midiscore_exe
 
 clean:
 	rm testrunner.exe *.o ../source/*.o ../midifile/src/*.o
@@ -23,7 +23,7 @@ SOURCES=$(filter-out ../source/main.cpp, $(wildcard ../midifile/src/*.cpp) $(wil
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=testrunner.exe
 
-makescore_exe: $(SOURCES) $(EXECUTABLE)
+midiscore_exe: $(SOURCES) $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(LDFLAGS) $(OBJECTS) -o $@

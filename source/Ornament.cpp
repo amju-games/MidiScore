@@ -50,11 +50,13 @@ std::vector<OrnamentCounts> OrnamentAnalyzer::GetOrnamentationPerBar(
     int ticksPerBar,
     // Maximum duration for a note to be considered part of an ornament,
     //  in ticks.
-    int maxOrnamentNoteDurationTicks)
+    int maxOrnamentNoteDurationTicks,
+    // Max gap between grace notes in ticks.
+    int maxGapTicks)
 {
   // Calc max gap between notes in ticks:  a fraction of 
   //  maxOrnamentNoteDurationTicks.
-  const int maxGap = maxOrnamentNoteDurationTicks / 4;
+//  const int maxGap = maxOrnamentNoteDurationTicks / 4;
 //  std::cout << "Max gap: " << maxGap << "\n";
 
     std::vector<OrnamentCounts> barReports(totalBars);
@@ -92,7 +94,7 @@ std::vector<OrnamentCounts> OrnamentAnalyzer::GetOrnamentationPerBar(
             //double gap = notes[seqEnd + 1].start_time - notes[seqEnd].end_time;
             int gap = notes[seqEnd + 1].start_tick - notes[seqEnd].end_tick;
 
-            if (nextDurTicks < extMaxDuration && gap < maxGap) 
+            if (nextDurTicks < extMaxDuration && gap < maxGapTicks) 
             {
                 seqEnd++;
             } else {
@@ -100,7 +102,7 @@ std::vector<OrnamentCounts> OrnamentAnalyzer::GetOrnamentationPerBar(
             }
         }
 
-        OrnamentType type = classifySequence(notes, i, seqEnd, maxOrnamentNoteDurationTicks, maxGap);
+        OrnamentType type = classifySequence(notes, i, seqEnd, maxOrnamentNoteDurationTicks, maxGapTicks);
 
         // Classifying weeds out quick notes that are not grace notes
         //  (staccato notes).
@@ -164,6 +166,14 @@ OrnamentType OrnamentAnalyzer::classifySequence(
             int timeToNextTicks = notes[start + 1].start_tick - notes[start].start_tick;
             if (pitchDiff <= 2 && timeToNextTicks <= maxGap) {
                 return OrnamentType::GraceNote;
+            }
+            else
+            {
+              std::cout << "Grace note detector: pitch diff: " 
+                << pitchDiff
+                << " timeToNext: " << timeToNextTicks
+                << " maxGap: " << maxGap 
+                << "\n";
             }
         }
         return OrnamentType::None;

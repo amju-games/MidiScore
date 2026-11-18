@@ -427,7 +427,8 @@ static std::vector<OrnamentCounts> FindOrnaments(
   smf::MidiFile& midifile, 
   int track,
   TimeSig ts,
-  int ornamentNoteMaxDurationTicks)
+  int ornamentNoteMaxDurationTicks,
+  int ornamentMaxGapTicks)
 {
   int numBars = NumBars(midifile, track, ts);
   if (numBars == 0) 
@@ -439,7 +440,8 @@ static std::vector<OrnamentCounts> FindOrnaments(
   int ticksPerBar = TicksPerBar(midifile, ts);
 
   auto reports = OrnamentAnalyzer::GetOrnamentationPerBar(
-    midifile, track, numBars, ticksPerBar, ornamentNoteMaxDurationTicks);
+    midifile, track, numBars, ticksPerBar, ornamentNoteMaxDurationTicks,
+    ornamentMaxGapTicks);
 
   return reports;
 }
@@ -510,12 +512,16 @@ std::string ToString(
 
     int ornamentDurationTicks = 
       CalcTpqMultipleForTimeVal(tpq, quantRes);
+    // TODO how valid is this
+    int ornamentMaxGapTicks = ornamentDurationTicks / 2;
+
     std::cout << "// Ornamentation duration: " 
       << ornamentDurationTicks << " ticks "
       << "(1/"
       << (tpq / ornamentDurationTicks) << " crotchet)\n";
 
-    ornaments = FindOrnaments(midifile, *track, ts, ornamentDurationTicks);
+    ornaments = FindOrnaments(midifile, *track, ts, 
+      ornamentDurationTicks, ornamentMaxGapTicks);
 /*
     std::cout << "Ornamentation:\n";
     for (int i = 0; i < ornaments.size(); ++i)

@@ -367,7 +367,7 @@ std::string Event::ToString() const
     return TimeSigString(m_timeSig);
 
   default:
-    std::cout << "No String for Event Type " 
+    std::cout << "*** Error: No String for Event Type " 
       << static_cast<int>(m_type) << "\n";
     assert(0);
     break;
@@ -395,6 +395,7 @@ void Event::SetTimeVal(int tpq)
   {
     // Duration is bigger than sb4. (with the dot).
     --it; // use largest supported value, (but it's wrong).
+    /*
     // TODO We need a better way of reporting errors
     std::cout << "// *** Event duration too large! Event pitch: " 
       << m_pitch 
@@ -405,12 +406,14 @@ void Event::SetTimeVal(int tpq)
       << " crotchets), duration: "
       << m_duration 
       << " ticks.\n"; 
+    */
   } 
   else if (it == multiples.begin()) 
   {
     // Is duration smaller than smallest type?
     if (m_duration < std::get<0>(multiples.front()))
     {
+      /*
       std::cout << "// *** Event duration too small! Event pitch: " 
         << m_pitch 
         << " at time: " 
@@ -420,6 +423,7 @@ void Event::SetTimeVal(int tpq)
         << " crotchets), duration: "
         << m_duration 
         << " ticks.\n"; 
+      */
     }
   }
   else
@@ -916,6 +920,7 @@ void InsertTimeSetEvents(int tpq, Events& events)
         && it->m_start != prevEventEnd
         && !it->IsBarLine())
     {
+/*
 std::cout << "// * Inserting a time set event! This event: \""
   << it->ToString()
   << "\" has start time: " 
@@ -923,6 +928,7 @@ std::cout << "// * Inserting a time set event! This event: \""
   << ", but prev end time is " 
   << prevEventEnd 
   << "..\n";
+*/
       it = events.insert(it, MakeTimeSet(tpq, it->m_start));
     }
 

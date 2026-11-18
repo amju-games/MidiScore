@@ -38,9 +38,10 @@ std::string GetOrnamentInfo(
   int ticksPerBar = TicksPerBar(midifile, ts);
   // Get max num ticks for a note to be considered part of an ornament
   int ornamentNoteMaxTicks = GetOrnamentNoteMaxTicks(tpq, quant);
-
+  int ornamentMaxGapTicks = ornamentNoteMaxTicks / 2;
   auto reports = OrnamentAnalyzer::GetOrnamentationPerBar(
-    midifile, track, numBars, ticksPerBar, ornamentNoteMaxTicks);
+    midifile, track, numBars, ticksPerBar, 
+    ornamentNoteMaxTicks, ornamentMaxGapTicks);
 
 //  std::cout << "num bars: " << numBars << "\n";
 //  std::cout << "num reports: " << reports.size() << "\n";

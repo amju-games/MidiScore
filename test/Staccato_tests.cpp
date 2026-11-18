@@ -43,7 +43,7 @@ TEST_CASE("Find staccato notes", "[Staccato]")
 
   int numStacc = StaccatoPass(events);
 
-  std::cout << OutputEvents(events) << "\n";
+//  std::cout << OutputEvents(events) << "\n";
 
   REQUIRE(numStacc == 1);
   REQUIRE(events[0].m_isStacc);
@@ -78,7 +78,7 @@ TEST_CASE("Not allowed on RHS of tie", "[Staccato]")
 
   int numStacc = StaccatoPass(events);
 
-  std::cout << OutputEvents(events) << "\n";
+//  std::cout << OutputEvents(events) << "\n";
 
   REQUIRE(numStacc == 1);
   REQUIRE(events[0].m_isStacc);

@@ -503,7 +503,7 @@ TEST_CASE("Insert whole bar rest, not split", "[Events]")
 
   InsertRests(tpq, events, TimeSig::TS_3_4);
 
-  std::cout << OutputEvents(events);
+//  std::cout << OutputEvents(events);
   // Expect dotted minim whole bar rest
   REQUIRE(events.size() == 2);
   REQUIRE(events[0].IsRest());
